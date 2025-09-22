@@ -1,0 +1,43 @@
+name: Simple Hex Repository Test
+on: [workflow_dispatch, push]
+
+jobs:
+  hex-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        test: [network, tools, performance]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/nix-installer-action@main
+        continue-on-error: true
+
+      - name: Test ${{ matrix.test }}
+        continue-on-error: true
+        run: |
+          case "${{ matrix.test }}" in
+            "network")
+              nix-shell -p curl nmap --run 'curl -s ifconfig.me > network-result.txt && echo "Network test complete"'
+              ;;
+            "tools")
+              nix-shell -p jq python3 nodejs --run 'echo "Tools available: jq $(jq --version), python3 $(python3 --version), node $(node --version)" > tools-result.txt'
+              ;;
+            "performance")
+              nix-shell -p coreutils bc --run 'start=$(date +%s%N); sleep 0.1; end=$(date +%s%N); time=$(echo "scale=3; ($end - $start) / 1000000000" | bc); echo "Performance test: ${time}s" > perf-result.txt'
+              ;;
+          esac
+
+      - name: Ubuntu Fallback
+        if: failure()
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y curl jq python3 nodejs
+          curl -s ifconfig.me > fallback-result.txt
+          echo "Ubuntu fallback successful"
+
+      - name: Upload Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: hex-test-${{ matrix.test }}-results
+          path: "*.txt"
+          retention-days: 1
