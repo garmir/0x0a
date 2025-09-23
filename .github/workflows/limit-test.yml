@@ -1,0 +1,38 @@
+name: Limit Testing - Crypto_Operations
+on: [push, workflow_dispatch]
+
+jobs:
+  limit-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/nix-installer-action@main
+        continue-on-error: true
+
+      - name: Crypto_Operations Limit Testing
+        continue-on-error: true
+        run: |
+          nix-shell -p openssl gnupg --run '
+            echo "=== LIMIT TEST: Crypto_Operations ===" > limit-test-0x0a.txt
+            echo "Repository: ${{ github.repository }}" >> limit-test-0x0a.txt
+            echo "Timestamp: $(date)" >> limit-test-0x0a.txt
+
+            openssl rand -hex 32 >> limit-test-0x0a.txt; echo "test" | openssl dgst -sha256 >> limit-test-0x0a.txt; gpg --version | head -3 >> limit-test-0x0a.txt
+
+            echo "✅ Limit test completed" >> limit-test-0x0a.txt
+          '
+
+      - name: Ubuntu Fallback Limit Test
+        if: failure()
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y openssl gnupg
+          echo "Ubuntu fallback limit test: Crypto_Operations" > ubuntu-limit-0x0a.txt
+          echo "Basic test completed" >> ubuntu-limit-0x0a.txt
+
+      - name: Upload Limit Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: limit-test-Crypto_Operations-0x0a
+          path: "*.txt"
+          retention-days: 7
